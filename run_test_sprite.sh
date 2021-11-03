@@ -1,0 +1,18 @@
+python test_sprite_cls.py \
+    --type_gt action \
+    --gpu 3 \
+    --niter 3 \
+    --log_dir logs_test \
+    --batch_size 128 \
+    --rnn_size 256 \
+    --g_dim 128 \
+    --f_dim 256 \
+    --z_dim 32 \
+    --lr 0.001 \
+    --weight_f 1 \
+    --weight_z 1 \
+    --weight_c_aug 10 \
+    --weight_m_aug 10 \
+    --sche const \
+    --model_epoch 100 \
+    --model_dir ./ckpts/Sprite
