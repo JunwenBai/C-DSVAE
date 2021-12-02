@@ -52,11 +52,11 @@ We provide a sample Sprites [checkpoint](https://drive.google.com/file/d/1dRg6MN
 If you are inspired by our work, please cite the following paper:
 
 ```bibtex
-@inproceedings{bai2021contrastively,
+@article{bai2021contrastively,
   title={Contrastively Disentangled Sequential Variational Autoencoder},
-  author={Bai, Junwen and Wang, Weiran and Gomes, Carla},
-  booktitle={Advances in Neural Information Processing Systems},
-  volume={},
+  author={Bai, Junwen and Wang, Weiran and Gomes, Carla P},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
   year={2021}
 }
 ```
