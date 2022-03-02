@@ -70,8 +70,6 @@ mse_loss = nn.MSELoss().cuda()
 def train(x, label_A, label_D, c_aug, m_aug, model, optimizer, contras_fn, opt, mode="train"):
     if mode == "train":
         model.zero_grad()
-    #print("x:", len(x)) # 3
-    #print("x[0]:", x[0].shape) # [128, 8, 3, 64, 64]
 
     if isinstance(x, list):
         batch_size = x[0].size(0) # 128
@@ -83,18 +81,6 @@ def train(x, label_A, label_D, c_aug, m_aug, model, optimizer, contras_fn, opt, 
     f_mean, f_logvar, f, z_post_mean, z_post_logvar, z_post, z_prior_mean, z_prior_logvar, z_prior, recon_x = model(x) #pred
     f_mean_c, f_logvar_c, f_c, _, _, _, _, _, _, _ = model(c_aug)
     _, _, _, z_post_mean_m, z_post_logvar_m, z_post_m, _, _, _, _ = model(m_aug)
-
-    #print("f_mean:", len(f_mean), f_mean[0].shape) # 3 torch.Size([128, 256])
-    #print("f_logvar:", f_logvar.shape) # torch.Size([128, 256])
-    #print("f_post:", f_post.shape) # torch.Size([128, 256])
-    #print("z_mean_post:", z_mean_post.shape) # torch.Size([128, 8, 32])
-    #print("z_logvar_post:", z_logvar_post.shape) # torch.Size([128, 8, 32])
-    #print("z_post:", z_post.shape) # torch.Size([128, 8, 32])
-    #print("z_mean_prior:", z_mean_prior.shape) # [128, 8, 32]
-    #print("z_logvar_prior:", z_logvar_prior.shape) # [128, 8, 32]
-    #print("z_prior:", z_prior.shape) # [128, 8, 32]
-    # recon_x: [128, 8, 3, 64, 64]
-    # pred_area: [1024, 9]
 
     mi_xs = compute_mi(f, (f_mean, f_logvar))
     n_bs = z_post.shape[0]
@@ -138,19 +124,15 @@ def train(x, label_A, label_D, c_aug, m_aug, model, optimizer, contras_fn, opt, 
         _logq_z_tmp = log_density(z_post.transpose(0, 1).view(n_frame, batch_size, 1, z_dim), # [8, 128, 1, 32]
                                   z_post_mean.transpose(0, 1).view(n_frame, 1, batch_size, z_dim), # [8, 1, 128, 32]
                                   z_post_logvar.transpose(0, 1).view(n_frame, 1, batch_size, z_dim)) # [8, 1, 128, 32]
-        #print("_logq_f_tmp:", _logq_f_tmp.shape) # [8, 128, 128, 256]
-        #print("_logq_z_tmp:", _logq_z_tmp.shape) # [8, 128, 128, 32]
 
         _logq_fz_tmp = torch.cat((_logq_f_tmp, _logq_z_tmp), dim=3) # [8, 128, 128, 288]
 
-        #print(batch_size, opt.dataset_size) # 28, 9000
         logq_f = (logsumexp(_logq_f_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size)) # [8, 128]
         logq_z = (logsumexp(_logq_z_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size)) # [8, 128]
         logq_fz = (logsumexp(_logq_fz_tmp.sum(3), dim=2, keepdim=False) - math.log(batch_size * opt.dataset_size)) # [8, 128]
         # n_frame x batch_size
         mi_fz = F.relu(logq_fz - logq_f - logq_z).mean()
 
-    #loss = l_recon + kld_f*opt.weight_f + kld_z*opt.weight_z + trp_loss*opt.weight_triple + motion_loss*opt.weight_motion + mi_fz*opt.weight_MI
     loss = l_recon + kld_f*opt.weight_f + kld_z*opt.weight_z + mi_fz
     if opt.weight_c_aug:
         loss += con_loss_c*opt.weight_c_aug
@@ -161,100 +143,8 @@ def train(x, label_A, label_D, c_aug, m_aug, model, optimizer, contras_fn, opt, 
         model.zero_grad()
         loss.backward()
         optimizer.step()
-    '''if optimizer_cls and mode == "train":
-        optimizer_cls.step()'''
-    return [i.data.cpu().numpy() for i in [l_recon, kld_f, kld_z, con_loss_c, con_loss_m, mi_fz, mi_xs, mi_xz]]
-
-def test_epoch(epoch, classifier, cdsvae, test_loader, writer):
-    cdsvae.eval()
-    label1_all, label2_all, label3_all = list(), list(), list()
-    pred1_all, pred2_all, pred3_all = list(), list(), list()
-    label_gt = list()
-    for data in test_loader:
-        x, label_A, label_D = reorder(data['images']), data['A_label'], data['D_label']
-        x = x.cuda()
-
-        """ #1 change"""
-        if opt.type_gt == "action":
-            recon_x_sample, recon_x = cdsvae.forward_fixed_motion_for_classification(x)
-        else:
-            recon_x_sample, recon_x = cdsvae.forward_fixed_content_for_classification(x)
-
-        with torch.no_grad():
-            """ #2 change"""
-            pred1_1, pred1_2, pred1_3, pred1_4, pred1_5 = classifier(x)
-            pred2_1, pred2_2, pred2_3, pred2_4, pred2_5 = classifier(recon_x_sample)
-            pred3_1, pred3_2, pred3_3, pred3_4, pred3_5 = classifier(recon_x)
-            if opt.type_gt == "action":
-                pred1, pred2, pred3 = pred1_1, pred2_1, pred3_1
-            elif opt.type_gt == "skin":
-                pred1, pred2, pred3 = pred1_2, pred2_2, pred3_2
-            elif opt.type_gt == "top":
-                pred1, pred2, pred3 = pred1_3, pred2_3, pred3_3
-            elif opt.type_gt == "pant":
-                pred1, pred2, pred3 = pred1_4, pred2_4, pred3_4
-            elif opt.type_gt == "hair":
-                pred1, pred2, pred3 = pred1_5, pred2_5, pred3_5
-
-            pred1 = F.softmax(pred1, dim = 1)
-            pred2 = F.softmax(pred2, dim = 1)
-            pred3 = F.softmax(pred3, dim = 1)
-
-        label1 = np.argmax(pred1.detach().cpu().numpy(), axis=1)
-        label2 = np.argmax(pred2.detach().cpu().numpy(), axis=1)
-        label3 = np.argmax(pred3.detach().cpu().numpy(), axis=1)
-
-        pred1_all.append(pred1.detach().cpu().numpy())
-        pred2_all.append(pred2.detach().cpu().numpy())
-        pred3_all.append(pred3.detach().cpu().numpy())
-
-        """ #3 change"""
-        if opt.type_gt == "action":
-            label_gt.append(label_D.numpy())
-        elif opt.type_gt == "skin":
-            label_gt.append(label_A[:,0].numpy())
-        elif opt.type_gt == "top":
-            label_gt.append(label_A[:,1].numpy())
-        elif opt.type_gt == "pant":
-            label_gt.append(label_A[:,2].numpy())
-        elif opt.type_gt == "hair":
-            label_gt.append(label_A[:,3].numpy())
-
-        label1_all.append(label1)
-        label2_all.append(label2)
-        label3_all.append(label3)
-    label1_all = np.hstack(label1_all)
-    label2_all = np.hstack(label2_all)
-    label3_all = np.hstack(label3_all)
-    label_gt = np.hstack(label_gt)
-
-    pred1_all = np.vstack(pred1_all)
-    pred2_all = np.vstack(pred2_all)
-    pred3_all = np.vstack(pred3_all)
-
-    acc = (label1_all == label2_all).mean()
-    kl  = KL_divergence(pred2_all, pred1_all)
-
-    """These scores are influented by label distribution. select pred2_all with uniform label distribution"""
-    nSample_per_cls = min([(label_gt==i).sum() for i in np.unique(label_gt)])
-    #print(nSample_per_cls)
-    index  = np.hstack([np.nonzero(label_gt == i)[0][:nSample_per_cls] for i in np.unique(label_gt)]).squeeze()
-    pred2_selected = pred2_all[index]
-
-    IS  = inception_score(pred2_selected)
-    H_yx = entropy_Hyx(pred2_selected)
-    H_y = entropy_Hy(pred2_selected)
     
-    print("###############")
-    print('Test acc: {:.2f}%, kl: {:.4f}, IS: {:.4f}, H_yx: {:.4f}, H_y: {:.4f}'.format(acc*100, kl, IS, H_yx, H_y))
-    print("###############")
-
-    if writer is not None:
-        writer.add_scalar("Test/acc", acc, epoch)
-        writer.add_scalar("Test/kl", kl, epoch)
-        writer.add_scalar("Test/IS", IS, epoch)
-        writer.add_scalar("Test/H_yx", H_yx, epoch)
-        writer.add_scalar("Test/H_y", H_y, epoch)
+    return [i.data.cpu().numpy() for i in [l_recon, kld_f, kld_z, con_loss_c, con_loss_m, mi_fz, mi_xs, mi_xz]]
 
 
 def main(opt):
@@ -435,8 +325,6 @@ def main(opt):
                 print_log('val_xz {} {}'.format(epoch, val_mi_xz.item()/n_batch), mi_path, False)
                 print_log('val_fz {} {}'.format(epoch, val_mi_fz.item()/n_batch), mi_path, False)
 
-        if epoch == opt.nEpoch-1 or epoch % 10 == 0:
-            test_epoch(epoch, classifier, cdsvae, test_loader, writer)
 
 # X, X, 64, 64, 3 -> # X, X, 3, 64, 64
 def reorder(sequence):
