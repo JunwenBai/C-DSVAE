@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 class contrastive_loss(nn.Module):
     def __init__(self, tau=1, normalize=False):
@@ -9,16 +10,23 @@ class contrastive_loss(nn.Module):
 
     def forward(self, xi, xj):
 
-        x = torch.cat((xi, xj), dim=0) 
+        x = torch.cat((xi, xj), dim=0) # [128, 256]
 
         is_cuda = x.is_cuda
         sim_mat = torch.mm(x, x.T)
-        if self.normalize: 
+        if self.normalize: # False
             sim_mat_denom = torch.mm(torch.norm(x, dim=1).unsqueeze(1), torch.norm(x, dim=1).unsqueeze(1).T)
             sim_mat = sim_mat / sim_mat_denom.clamp(min=1e-16)
 
         sim_mat = torch.exp(sim_mat / self.tau)
 
+        # no diag because it's not diffrentiable -> sum - exp(1 / tau)
+        # diag_ind = torch.eye(xi.size(0) * 2).bool()
+        # diag_ind = diag_ind.cuda() if use_cuda else diag_ind
+
+        # sim_mat = sim_mat.masked_fill_(diag_ind, 0)
+
+        # top
         if self.normalize:
             sim_mat_denom = torch.norm(xi, dim=1) * torch.norm(xj, dim=1)
             sim_match = torch.exp(torch.sum(xi * xj, dim=-1) / sim_mat_denom / self.tau)
@@ -57,20 +65,40 @@ def log_importance_weight_matrix(batch_size, dataset_size):
     return W.log()
 
 def compute_mi(latent_sample, latent_dist):
-    log_pz, log_qz, log_prod_qzi, log_q_zCx = _get_log_pz_qz_prodzi_qzCx(latent_sample, latent_dist)
+    log_pz, log_qz, log_prod_qzi, log_q_zCx = _get_log_pz_qz_prodzi_qzCx(latent_sample,
+                                                                         latent_dist,
+                                                                         None,
+                                                                         is_mss=False)
+    # I[z;x] = KL[q(z,x)||q(x)q(z)] = E_x[KL[q(z|x)||q(z)]]
     mi_loss = (log_q_zCx - log_qz).mean()
+
     return mi_loss
 
-def _get_log_pz_qz_prodzi_qzCx(latent_sample, latent_dist, n_data=None, is_mss=False):
+
+def _get_log_pz_qz_prodzi_qzCx(latent_sample, latent_dist, n_data, is_mss=True):
     batch_size, hidden_dim = latent_sample.shape
+    #print("latent_sample:", latent_sample.shape)
+    #print("latent_dist:", len(latent_dist), latent_dist[0].shape, latent_dist[1].shape)
+    #print("is_mss:", is_mss)
+
+    # calculate log q(z|x)
     log_q_zCx = log_density_gaussian(latent_sample, *latent_dist).sum(dim=1)
+
+    # calculate log p(z)
+    # mean and log var is 0
+    #zeros = torch.zeros_like(latent_sample)
+    #log_pz = log_density_gaussian(latent_sample, zeros, zeros).sum(1)
+
     mat_log_qz = matrix_log_density_gaussian(latent_sample, *latent_dist)
 
     if is_mss:
+        # use stratification
         log_iw_mat = log_importance_weight_matrix(batch_size, n_data).to(latent_sample.device)
         mat_log_qz = mat_log_qz + log_iw_mat.view(batch_size, batch_size, 1)
 
     log_qz = torch.logsumexp(mat_log_qz.sum(2), dim=1, keepdim=False)
-    
+    #log_prod_qzi = torch.logsumexp(mat_log_qz, dim=1, keepdim=False).sum(1)
+
+    #return log_pz, log_qz, log_prod_qzi, log_q_zCx
     return None, log_qz, None, log_q_zCx
 

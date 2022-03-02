@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-import nn.functional as F
+import torch.nn.functional as F
 import argparse
 import os
 import json
@@ -69,7 +69,10 @@ def main(opt):
 
     if opt.model_dir != '':
         cdsvae = CDSVAE(opt)
-        cdsvae.load_state_dict(saved_model['model'])
+        if 'model' in saved_model:
+            cdsvae.load_state_dict(saved_model['model'], strict=False)
+        else:
+            cdsvae.load_state_dict(saved_model['ds_vae'].state_dict(), strict=False)
 
     # --------- transfer to gpu ------------------------------------
     if torch.cuda.device_count() > 1:

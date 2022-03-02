@@ -2,6 +2,9 @@ import numpy as np
 import torch
 
 def logsumexp(value, dim=None, keepdim=False):
+    """Numerically stable implementation of the operation
+    value.exp().sum(dim, keepdim).log()
+    """
     if dim is not None:
         m, _ = torch.max(value, dim=dim, keepdim=True)
         value0 = value - m
@@ -21,3 +24,12 @@ def log_density(sample, mu, logsigma):
     tmp = (sample - mu) * inv_sigma
     return -0.5 * (tmp * tmp + 2 * logsigma + c)
 
+def log_importance_weight_matrix(batch_size, dataset_size):
+    N = dataset_size
+    M = batch_size - 1
+    strat_weight = (N - M) / (N * M)
+    W = torch.Tensor(batch_size, batch_size).fill_(1 / M)
+    W.view(-1)[::M+1] = 1 / N
+    W.view(-1)[1::M+1] = strat_weight
+    W[M-1, 0] = strat_weight
+    return W.log()

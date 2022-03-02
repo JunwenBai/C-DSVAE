@@ -15,7 +15,7 @@ class LinearUnit(nn.Module):
         else:
             self.model = nn.Sequential(
                     nn.Linear(in_features, out_features), nonlinearity)
-    
+
     def forward(self, x):
         return self.model(x)
 
@@ -28,20 +28,7 @@ class conv(nn.Module):
                 nn.BatchNorm2d(nout),
                 nn.LeakyReLU(0.2, inplace=True),
                 )
-    
-    def forward(self, input):
-        return self.main(input)
 
-
-class upconv(nn.Module):
-    def __init__(self, nin, nout):
-        super(upconv, self).__init__()
-        self.main = nn.Sequential(
-                nn.ConvTranspose2d(nin, nout, 4, 2, 1),
-                nn.BatchNorm2d(nout),
-                nn.LeakyReLU(0.2, inplace=True),
-                )
-    
     def forward(self, input):
         return self.main(input)
 
@@ -51,10 +38,15 @@ class encoder(nn.Module):
         super(encoder, self).__init__()
         self.dim = dim
         nf = 64
+        # input is (nc) x 64 x 64
         self.c1 = conv(nc, nf)
+        # state size. (nf) x 32 x 32
         self.c2 = conv(nf, nf * 2)
+        # state size. (nf*2) x 16 x 16
         self.c3 = conv(nf * 2, nf * 4)
+        # state size. (nf*4) x 8 x 8
         self.c4 = conv(nf * 4, nf * 8)
+        # state size. (nf*8) x 4 x 4
         self.c5 = nn.Sequential(
                 nn.Conv2d(nf * 8, dim, 4, 1, 0),
                 nn.BatchNorm2d(dim),
@@ -67,7 +59,20 @@ class encoder(nn.Module):
         h3 = self.c3(h2)
         h4 = self.c4(h3)
         h5 = self.c5(h4)
-        return h5.view(-1, self.dim), None
+        return h5.view(-1, self.dim), [h1, h2, h3, h4]
+
+
+class upconv(nn.Module):
+    def __init__(self, nin, nout):
+        super(upconv, self).__init__()
+        self.main = nn.Sequential(
+                nn.ConvTranspose2d(nin, nout, 4, 2, 1),
+                nn.BatchNorm2d(nout),
+                nn.LeakyReLU(0.2, inplace=True),
+                )
+
+    def forward(self, input):
+        return self.main(input)
 
 
 class decoder(nn.Module):
@@ -81,12 +86,17 @@ class decoder(nn.Module):
                 nn.BatchNorm2d(nf * 8),
                 nn.LeakyReLU(0.2, inplace=True)
                 )
+        # state size. (nf*8) x 4 x 4
         self.upc2 = upconv(nf * 8, nf * 4)
+        # state size. (nf*4) x 8 x 8
         self.upc3 = upconv(nf * 4, nf * 2)
+        # state size. (nf*2) x 16 x 16
         self.upc4 = upconv(nf * 2, nf)
+        # state size. (nf) x 32 x 32
         self.upc5 = nn.Sequential(
                 nn.ConvTranspose2d(nf, nc, 4, 2, 1),
                 nn.Sigmoid()
+                # state size. (nc) x 64 x 64
                 )
 
     def forward(self, input):
@@ -99,66 +109,23 @@ class decoder(nn.Module):
 
         return output
 
-class classifier_Sprite_all(nn.Module):
-    def __init__(self, opt):
-        super(classifier_Sprite_all, self).__init__()
-        self.g_dim = opt.g_dim  # frame feature
-        self.channels = opt.channels  # frame feature
-        self.hidden_dim = opt.rnn_size
-        self.frames = opt.frames
-        self.encoder = encoder(self.g_dim, self.channels)
-        self.bilstm = nn.LSTM(self.g_dim, self.hidden_dim, 1, bidirectional=True, batch_first=True)
-        self.cls_skin = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
-            nn.ReLU(True),
-            nn.Linear(self.hidden_dim, 6))
-        self.cls_top = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
-            nn.ReLU(True),
-            nn.Linear(self.hidden_dim, 6))
-        self.cls_pant = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
-            nn.ReLU(True),
-            nn.Linear(self.hidden_dim, 6))
-        self.cls_hair = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
-            nn.ReLU(True),
-            nn.Linear(self.hidden_dim, 6))
-        self.cls_action = nn.Sequential(
-            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
-            nn.ReLU(True),
-            nn.Linear(self.hidden_dim, 9))
-
-    def encoder_frame(self, x):
-        x_shape = x.shape
-        x = x.view(-1, x_shape[-3], x_shape[-2], x_shape[-1])
-        x_embed = self.encoder(x)[0]
-        return x_embed.view(x_shape[0], x_shape[1], -1)
-
-    def forward(self, x):
-        conv_x = self.encoder_frame(x)
-        lstm_out, _ = self.bilstm(conv_x)
-        backward = lstm_out[:, 0, self.hidden_dim:2 * self.hidden_dim]
-        frontal = lstm_out[:, self.frames - 1, 0:self.hidden_dim]
-        lstm_out_f = torch.cat((frontal, backward), dim=1)
-        return self.cls_action(lstm_out_f), self.cls_skin(lstm_out_f), self.cls_pant(lstm_out_f), \
-               self.cls_top(lstm_out_f), self.cls_hair(lstm_out_f)
-
 
 class CDSVAE(nn.Module):
     def __init__(self, opt):
         super(CDSVAE, self).__init__()
         self.f_dim = opt.f_dim  # content
         self.z_dim = opt.z_dim  # motion
-        self.g_dim = opt.g_dim 
-        self.channels = opt.channels 
+        self.g_dim = opt.g_dim  # frame feature
+        self.channels = opt.channels  # frame feature
         self.hidden_dim = opt.rnn_size
         self.f_rnn_layers = opt.f_rnn_layers
         self.frames = opt.frames
 
+        # Frame encoder and decoder
         self.encoder = encoder(self.g_dim, self.channels)
         self.decoder = decoder(self.z_dim + self.f_dim, self.channels)
 
+        # Prior of content is a uniform Gaussian and prior of the dynamics is an LSTM
         self.z_prior_lstm_ly1 = nn.LSTMCell(self.z_dim, self.hidden_dim)
         self.z_prior_lstm_ly2 = nn.LSTMCell(self.hidden_dim, self.hidden_dim)
 
@@ -170,7 +137,7 @@ class CDSVAE(nn.Module):
         self.f_logvar = LinearUnit(self.hidden_dim * 2, self.f_dim, False)
 
         self.z_rnn = nn.RNN(self.hidden_dim * 2, self.hidden_dim, batch_first=True)
-        
+        # Each timestep is for each z so no reshaping and feature mixing
         self.z_mean = nn.Linear(self.hidden_dim, self.z_dim)
         self.z_logvar = nn.Linear(self.hidden_dim, self.z_dim)
 
@@ -179,7 +146,9 @@ class CDSVAE(nn.Module):
             conv_x = self.encoder_frame(x[0])
         else:
             conv_x = self.encoder_frame(x)
+        # pass the bidirectional lstm
         lstm_out, _ = self.z_lstm(conv_x)
+        # get f:
         backward = lstm_out[:, 0, self.hidden_dim:2 * self.hidden_dim]
         frontal = lstm_out[:, self.frames - 1, 0:self.hidden_dim]
         lstm_out_f = torch.cat((frontal, backward), dim=1)
@@ -187,6 +156,7 @@ class CDSVAE(nn.Module):
         f_logvar = self.f_logvar(lstm_out_f)
         f_post = self.reparameterize(f_mean, f_logvar, random_sampling=True)
 
+        # pass to one direction rnn
         features, _ = self.z_rnn(lstm_out)
         z_mean = self.z_mean(features)
         z_logvar = self.z_logvar(features)
@@ -197,19 +167,22 @@ class CDSVAE(nn.Module):
             for _x in x[1:]:
                 conv_x = self.encoder_frame(_x)
                 lstm_out, _ = self.z_lstm(conv_x)
+                # get f:
                 backward = lstm_out[:, 0, self.hidden_dim:2 * self.hidden_dim]
                 frontal = lstm_out[:, self.frames - 1, 0:self.hidden_dim]
                 lstm_out_f = torch.cat((frontal, backward), dim=1)
                 f_mean = self.f_mean(lstm_out_f)
                 f_mean_list.append(f_mean)
             f_mean = f_mean_list
-        
+        # f_mean is list if triple else not
         return f_mean, f_logvar, f_post, z_mean, z_logvar, z_post
 
     def forward(self, x):
         f_mean, f_logvar, f_post, z_mean_post, z_logvar_post, z_post = self.encode_and_sample_post(x)
-        z_mean_prior, z_logvar_prior, z_prior = self.sample_z_prior_train(x.size(0), random_sampling=self.training)
-        
+        z_mean_prior, z_logvar_prior, z_prior = self.sample_z_prior_train(z_post, random_sampling=self.training)
+
+        z_flatten = z_post.view(-1, z_post.shape[2])
+
         f_expand = f_post.unsqueeze(1).expand(-1, self.frames, self.f_dim)
         zf = torch.cat((z_post, f_expand), dim=2)
         recon_x = self.decoder(zf)
@@ -225,6 +198,7 @@ class CDSVAE(nn.Module):
         zf = torch.cat((z_repeat, f_expand), dim=2)
         recon_x = self.decoder(zf)
         return f_mean, f_logvar, f_post, z_mean_post, z_logvar_post, z_post, z_mean_prior, z_logvar_prior, recon_x
+
 
     def forward_fixed_content(self, x):
         z_mean_prior, z_logvar_prior, _ = self.sample_z(x.size(0), random_sampling=self.training)
@@ -245,6 +219,7 @@ class CDSVAE(nn.Module):
 
         zf = torch.cat((z_mean_prior, f_expand), dim=2)
         recon_x_sample = self.decoder(zf)
+
 
         zf = torch.cat((z_mean_post, f_expand), dim=2)
         recon_x = self.decoder(zf)
@@ -268,12 +243,18 @@ class CDSVAE(nn.Module):
         return recon_x_sample, recon_x
 
     def encoder_frame(self, x):
+        # input x is list of length Frames [batchsize, channels, size, size]
+        # convert it to [batchsize, frames, channels, size, size]
+        # x = torch.stack(x, dim=1)
+        # [batch_size, frames, channels, size, size] to [batch_size * frames, channels, size, size]
         x_shape = x.shape
         x = x.view(-1, x_shape[-3], x_shape[-2], x_shape[-1])
         x_embed = self.encoder(x)[0]
+        # to [batch_size , frames, embed_dim]
         return x_embed.view(x_shape[0], x_shape[1], -1)
 
     def reparameterize(self, mean, logvar, random_sampling=True):
+        # Reparametrization occurs only if random sampling is set to true, otherwise mean is returned
         if random_sampling is True:
             eps = torch.randn_like(logvar)
             std = torch.exp(0.5 * logvar)
@@ -283,7 +264,7 @@ class CDSVAE(nn.Module):
             return mean
 
     def sample_z_prior_test(self, n_sample, n_frame, random_sampling=True):
-        z_out = None 
+        z_out = None  # This will ultimately store all z_s in the format [batch_size, frames, z_dim]
         z_means = None
         z_logvars = None
         batch_size = n_sample
@@ -295,6 +276,7 @@ class CDSVAE(nn.Module):
         c_t_ly2 = torch.zeros(batch_size, self.hidden_dim).cuda()
 
         for i in range(n_frame):
+            # two layer LSTM and two one-layer FC
             h_t_ly1, c_t_ly1 = self.z_prior_lstm_ly1(z_t, (h_t_ly1, c_t_ly1))
             h_t_ly2, c_t_ly2 = self.z_prior_lstm_ly2(h_t_ly1, (h_t_ly2, c_t_ly2))
 
@@ -302,20 +284,24 @@ class CDSVAE(nn.Module):
             z_logvar_t = self.z_prior_logvar(h_t_ly2)
             z_prior = self.reparameterize(z_mean_t, z_logvar_t, random_sampling)
             if z_out is None:
+                # If z_out is none it means z_t is z_1, hence store it in the format [batch_size, 1, z_dim]
                 z_out = z_prior.unsqueeze(1)
                 z_means = z_mean_t.unsqueeze(1)
                 z_logvars = z_logvar_t.unsqueeze(1)
             else:
+                # If z_out is not none, z_t is not the initial z and hence append it to the previous z_ts collected in z_out
                 z_out = torch.cat((z_out, z_prior.unsqueeze(1)), dim=1)
                 z_means = torch.cat((z_means, z_mean_t.unsqueeze(1)), dim=1)
                 z_logvars = torch.cat((z_logvars, z_logvar_t.unsqueeze(1)), dim=1)
+                # z_t = z_post[:,i,:]
             z_t = z_prior
         return z_means, z_logvars, z_out
 
-    def sample_z_prior_train(self, batch_size, random_sampling=True):
-        z_out = None 
+    def sample_z_prior_train(self, z_post, random_sampling=True):
+        z_out = None  # This will ultimately store all z_s in the format [batch_size, frames, z_dim]
         z_means = None
         z_logvars = None
+        batch_size = z_post.shape[0]
 
         z_t = torch.zeros(batch_size, self.z_dim).cuda()
         h_t_ly1 = torch.zeros(batch_size, self.hidden_dim).cuda()
@@ -324,6 +310,7 @@ class CDSVAE(nn.Module):
         c_t_ly2 = torch.zeros(batch_size, self.hidden_dim).cuda()
 
         for i in range(self.frames):
+            # two layer LSTM and two one-layer FC
             h_t_ly1, c_t_ly1 = self.z_prior_lstm_ly1(z_t, (h_t_ly1, c_t_ly1))
             h_t_ly2, c_t_ly2 = self.z_prior_lstm_ly2(h_t_ly1, (h_t_ly2, c_t_ly2))
 
@@ -331,27 +318,35 @@ class CDSVAE(nn.Module):
             z_logvar_t = self.z_prior_logvar(h_t_ly2)
             z_prior = self.reparameterize(z_mean_t, z_logvar_t, random_sampling)
             if z_out is None:
+                # If z_out is none it means z_t is z_1, hence store it in the format [batch_size, 1, z_dim]
                 z_out = z_prior.unsqueeze(1)
                 z_means = z_mean_t.unsqueeze(1)
                 z_logvars = z_logvar_t.unsqueeze(1)
             else:
+                # If z_out is not none, z_t is not the initial z and hence append it to the previous z_ts collected in z_out
                 z_out = torch.cat((z_out, z_prior.unsqueeze(1)), dim=1)
                 z_means = torch.cat((z_means, z_mean_t.unsqueeze(1)), dim=1)
                 z_logvars = torch.cat((z_logvars, z_logvar_t.unsqueeze(1)), dim=1)
-            z_t = z_prior
+            z_t = z_post[:,i,:]
         return z_means, z_logvars, z_out
 
+    # If random sampling is true, reparametrization occurs else z_t is just set to the mean
     def sample_z(self, batch_size, random_sampling=True):
-        z_out = None 
+        z_out = None  # This will ultimately store all z_s in the format [batch_size, frames, z_dim]
         z_means = None
         z_logvars = None
 
+        # All states are initially set to 0, especially z_0 = 0
         z_t = torch.zeros(batch_size, self.z_dim).cuda()
+        # z_mean_t = torch.zeros(batch_size, self.z_dim)
+        # z_logvar_t = torch.zeros(batch_size, self.z_dim)
         h_t_ly1 = torch.zeros(batch_size, self.hidden_dim).cuda()
         c_t_ly1 = torch.zeros(batch_size, self.hidden_dim).cuda()
         h_t_ly2 = torch.zeros(batch_size, self.hidden_dim).cuda()
         c_t_ly2 = torch.zeros(batch_size, self.hidden_dim).cuda()
         for _ in range(self.frames):
+            # h_t, c_t = self.z_prior_lstm(z_t, (h_t, c_t))
+            # two layer LSTM and two one-layer FC
             h_t_ly1, c_t_ly1 = self.z_prior_lstm_ly1(z_t, (h_t_ly1, c_t_ly1))
             h_t_ly2, c_t_ly2 = self.z_prior_lstm_ly2(h_t_ly1, (h_t_ly2, c_t_ly2))
 
@@ -359,12 +354,68 @@ class CDSVAE(nn.Module):
             z_logvar_t = self.z_prior_logvar(h_t_ly2)
             z_t = self.reparameterize(z_mean_t, z_logvar_t, random_sampling)
             if z_out is None:
+                # If z_out is none it means z_t is z_1, hence store it in the format [batch_size, 1, z_dim]
                 z_out = z_t.unsqueeze(1)
                 z_means = z_mean_t.unsqueeze(1)
                 z_logvars = z_logvar_t.unsqueeze(1)
             else:
+                # If z_out is not none, z_t is not the initial z and hence append it to the previous z_ts collected in z_out
                 z_out = torch.cat((z_out, z_t.unsqueeze(1)), dim=1)
                 z_means = torch.cat((z_means, z_mean_t.unsqueeze(1)), dim=1)
                 z_logvars = torch.cat((z_logvars, z_logvar_t.unsqueeze(1)), dim=1)
         return z_means, z_logvars, z_out
+
+
+class classifier_Sprite_all(nn.Module):                                                                                                                                           
+    def __init__(self, opt):
+        super(classifier_Sprite_all, self).__init__()
+        self.g_dim = opt.g_dim  # frame feature
+        self.channels = opt.channels  # frame feature
+        self.hidden_dim = opt.rnn_size
+        self.frames = opt.frames
+        from model import encoder
+        self.encoder = encoder(self.g_dim, self.channels)
+        self.bilstm = nn.LSTM(self.g_dim, self.hidden_dim, 1, bidirectional=True, batch_first=True)
+        self.cls_skin = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(True),
+            nn.Linear(self.hidden_dim, 6)) 
+        self.cls_top = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(True),
+            nn.Linear(self.hidden_dim, 6)) 
+        self.cls_pant = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(True),
+            nn.Linear(self.hidden_dim, 6)) 
+        self.cls_hair = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(True),
+            nn.Linear(self.hidden_dim, 6)) 
+        self.cls_action = nn.Sequential(
+            nn.Linear(self.hidden_dim * 2, self.hidden_dim),
+            nn.ReLU(True),
+            nn.Linear(self.hidden_dim, 9)) 
+
+
+    def encoder_frame(self, x): 
+        # input x is list of length Frames [batchsize, channels, size, size]
+        # convert it to [batchsize, frames, channels, size, size]
+        # x = torch.stack(x, dim=1)
+        # [batch_size, frames, channels, size, size] to [batch_size * frames, channels, size, size]
+        x_shape = x.shape
+        x = x.view(-1, x_shape[-3], x_shape[-2], x_shape[-1])
+        x_embed = self.encoder(x)[0]
+        # to [batch_size , frames, embed_dim]
+        return x_embed.view(x_shape[0], x_shape[1], -1) 
+
+    def forward(self, x): 
+        conv_x = self.encoder_frame(x)
+        # pass the bidirectional lstm
+        lstm_out, _ = self.bilstm(conv_x)
+        backward = lstm_out[:, 0, self.hidden_dim:2 * self.hidden_dim]
+        frontal = lstm_out[:, self.frames - 1, 0:self.hidden_dim]
+        lstm_out_f = torch.cat((frontal, backward), dim=1)
+        return self.cls_action(lstm_out_f), self.cls_skin(lstm_out_f), self.cls_pant(lstm_out_f), \
+               self.cls_top(lstm_out_f), self.cls_hair(lstm_out_f)
 

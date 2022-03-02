@@ -1,6 +1,6 @@
 python test_sprite_cls.py \
     --type_gt action \
-    --gpu 3 \
+    --gpu 4 \
     --niter 3 \
     --log_dir logs_test \
     --batch_size 128 \
