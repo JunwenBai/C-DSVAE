@@ -53,10 +53,11 @@ If you are inspired by our work, please cite the following paper:
 
 ```bibtex
 @article{bai2021contrastively,
-  title={Contrastively Disentangled Sequential Variational Autoencoder},
+  title={Contrastively disentangled sequential variational autoencoder},
   author={Bai, Junwen and Wang, Weiran and Gomes, Carla P},
   journal={Advances in Neural Information Processing Systems},
   volume={34},
+  pages={10105--10118},
   year={2021}
 }
 ```
