@@ -6,6 +6,8 @@
 
 This is the implementation for our [C-DSVAE](https://arxiv.org/abs/2110.12091), a novel self-supervised disentangled sequential representation learning method.
 
+A [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/stable/) implementation can be found [here](https://github.com/tomoya-yamanokuchi/Contrastively-Disentangled-Sequential-Variational-Audoencoder).
+
 ## Requirements
 - Python 3
 - PyTorch 1.7
