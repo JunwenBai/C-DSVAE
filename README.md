@@ -1,4 +1,4 @@
-# Contrastively Disentangled Sequential Variational Audoencoder (C-DSVAE)
+# Contrastively Disentangled Sequential Variational Autoencoder (C-DSVAE)
 
 ## Overview
 
