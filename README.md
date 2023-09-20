@@ -45,7 +45,7 @@ The pre-processed dataset: [data.pkl](https://drive.google.com/file/d/127LDb5Zth
 #### Classification Judge
 
 The *judge* classifiers are pretrained with full supervision separately. 
-* Sprites [judge](https://drive.google.com/file/d/1leSUS1gz6erCZ12xFINDMhV_J0tYIVcf/view?usp=sharing)
+* Sprites [judge](https://drive.google.com/file/d/1GB2HUk1iQvMEubOuYOD2CQpp106a0iKz/view?usp=sharing)
 
 #### C-DSVAE Checkpoints
 
