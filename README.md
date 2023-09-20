@@ -17,7 +17,7 @@ A [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/stable/) imple
 
 #### Sprites
 
-We provide the raw Sprites `.npy` [files](https://drive.google.com/drive/folders/1YphztSJNd3l9YTfr-Gh2Gvu4sNqydVkI?usp=sharing). One can also find the dataset on a third-party [repo](https://github.com/YingzhenLi/Sprites).
+We provide the raw Sprites `.npy` [files](https://drive.google.com/drive/folders/1CUSoP5zIYKYBtpI5YMK9OqnJV3zT_D7f?usp=sharing). One can also find the dataset on a third-party [repo](https://github.com/YingzhenLi/Sprites).
 
 For each split (train/test), we expect the following components for each sequence sample
 * `x`: raw sample of shape [8, 3, 64, 64]
