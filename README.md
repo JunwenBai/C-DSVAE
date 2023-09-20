@@ -26,7 +26,7 @@ For each split (train/test), we expect the following components for each sequenc
 * motion factors: action (3 classes), direction (3 classes)
 * content factors: skin, tops, pants, hair (each with 6 classes)
 
-The pre-processed dataset: [data.pkl](https://drive.google.com/file/d/1PLaEmvn7xrA_rNPCUnWYJd-YQ3HW0EDo/view?usp=share_link)
+The pre-processed dataset: [data.pkl](https://drive.google.com/file/d/1PLaEmvn7xrA_rNPCUnWYJd-YQ3HW0EDo/view?usp=sharing)
 
 ## Running
 
