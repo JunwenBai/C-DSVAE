@@ -49,7 +49,7 @@ The *judge* classifiers are pretrained with full supervision separately.
 
 #### C-DSVAE Checkpoints
 
-We provide a sample Sprites [checkpoint](https://drive.google.com/file/d/1dRg6MNUqp5xBe9-CvTQln6DCvrTZMjDD/view?usp=sharing). Checkpoint parameters can be found in `./run_test_sprite.sh`.
+We provide a sample Sprites [checkpoint](https://drive.google.com/file/d/1G6Mzn9KxvmYnSHx5VBiF6ZyXUT9b0uYY/view?usp=sharing). Checkpoint parameters can be found in `./run_test_sprite.sh`.
 
 ## Paper
 
