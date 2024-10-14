@@ -17,7 +17,7 @@ A [pytorch-lightning](https://pytorch-lightning.readthedocs.io/en/stable/) imple
 
 #### Sprites
 
-We provide the raw Sprites `.npy` [files](https://drive.google.com/drive/folders/1CUSoP5zIYKYBtpI5YMK9OqnJV3zT_D7f?usp=sharing). One can also find the dataset on a third-party [repo](https://github.com/YingzhenLi/Sprites).
+We provide the raw Sprites `.npy` [files](https://pan.baidu.com/s/1l9sKnNXGVJgRYPJrYcxmwA?pwd=rm4e). One can also find the dataset on a third-party [repo](https://github.com/YingzhenLi/Sprites).
 
 For each split (train/test), we expect the following components for each sequence sample
 * `x`: raw sample of shape [8, 3, 64, 64]
@@ -26,7 +26,7 @@ For each split (train/test), we expect the following components for each sequenc
 * motion factors: action (3 classes), direction (3 classes)
 * content factors: skin, tops, pants, hair (each with 6 classes)
 
-The pre-processed dataset: [data.pkl](https://drive.google.com/file/d/127LDb5ZthpcSn-oY7wCTmZ9IwD5K9_av/view?usp=sharing)
+The pre-processed dataset: [data.pkl](https://pan.baidu.com/s/1RN7F9UDwsYEZ2m03qO4BRA?pwd=7pfb)
 
 ## Running
 
@@ -45,11 +45,11 @@ The pre-processed dataset: [data.pkl](https://drive.google.com/file/d/127LDb5Zth
 #### Classification Judge
 
 The *judge* classifiers are pretrained with full supervision separately. 
-* Sprites [judge](https://drive.google.com/file/d/1GB2HUk1iQvMEubOuYOD2CQpp106a0iKz/view?usp=sharing)
+* Sprites [judge](https://pan.baidu.com/s/1zFLSIzH-N_ozXNXIJ7qCFg?pwd=rac3)
 
 #### C-DSVAE Checkpoints
 
-We provide a sample Sprites [checkpoint](https://drive.google.com/file/d/1G6Mzn9KxvmYnSHx5VBiF6ZyXUT9b0uYY/view?usp=sharing). Checkpoint parameters can be found in `./run_test_sprite.sh`.
+We provide a sample Sprites [checkpoint](https://pan.baidu.com/s/1BP1UeXJbCHy2zp_aoEAztg?pwd=qw9a). Checkpoint parameters can be found in `./run_test_sprite.sh`.
 
 ## Paper
 
